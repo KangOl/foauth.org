@@ -105,7 +105,7 @@ class OAuth(object):
         """
         raise NotImplementedError("callback() must be defined in a subclass")
 
-    def api(self, key, domain, path, method='GET', params=None, data=None):
+    def api(self, key, domain, path, method='GET', **kwargs):
         """
         Passes along an API request to the service and returns the response.
         """
@@ -163,8 +163,7 @@ class OAuth1(OAuth):
         except Exception:
             raise OAuthError('Unable to parse access token')
 
-    def api(self, key, domain, path, method='GET', params=None, data=None,
-            headers=None):
+    def api(self, key, domain, path, method='GET', **kwargs):
         protocol = self.https and 'https' or 'http'
         url = '%s://%s%s' % (protocol, domain, path)
         auth = requests.auth.OAuth1(client_key=self.client_id,
@@ -173,9 +172,8 @@ class OAuth1(OAuth):
                                     resource_owner_secret=key.secret,
                                     signature_method=self.signature_method,
                                     signature_type=self.signature_type)
-        return requests.request(method, url, auth=auth, params=params or {},
-                                data=data or {}, headers=headers or {},
-                                verify=self.verify)
+        return requests.request(method, url, auth=auth,
+                                verify=self.verify, **kwargs)
 
 
 class OAuth2(OAuth):
@@ -232,12 +230,12 @@ class OAuth2(OAuth):
 
         return self.parse_token(resp.content)
 
-    def api(self, key, domain, path, method='GET', params=None, data=None,
-            headers=None):
+    def api(self, key, domain, path, method='GET', **kwargs):
         protocol = self.https and 'https' or 'http'
         url = '%s://%s%s' % (protocol, domain, path)
         if self.token_type == BEARER:
             auth = Bearer(key.access_token, bearer_type=self.bearer_type)
-        return requests.request(method, url, auth=auth, params=params or {},
-                                data=data or {}, headers=headers or {},
-                                verify=self.verify)
+        else:
+            auth = None
+        return requests.request(method, url, auth=auth,
+                                verify=self.verify, **kwargs)

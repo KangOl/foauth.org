@@ -62,12 +62,10 @@ class RememberTheMilk(foauth.providers.OAuth2):
         req = requests.Request(self.authorize_url, params=params)
         return flask.redirect(req.full_url)
 
-    def api(self, key, domain, path, method='GET', params=None, data=None,
-            headers=None):
+    def api(self, key, domain, path, method='GET', **kwargs):
         url = 'http://%s%s' % (domain, path)
         auth = Auth(self.client_id, self.client_secret, key.access_token)
-        return requests.request(method, url, auth=auth, params=params or {},
-                                data=data or {}, headers=headers or {})
+        return requests.request(method, url, auth=auth, **kwargs)
 
     def get_user_id(self, key):
         r = self.api(key, self.api_domain, u'/services/rest/?method=rtm.auth.checkToken')

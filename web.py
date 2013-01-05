@@ -244,8 +244,8 @@ def api(domain, path):
 
             key = get_user_key(service, user)
             resp = service.api(key, domain, '/%s' % path, request.method,
-                               request.args, request.form or request.data,
-                               prepare_headers(request.headers))
+                               params=request.args, data=request.form or request.data,
+                               headers=prepare_headers(request.headers))
             content = resp.raw.read()
 
             if 'Transfer-Encoding' in resp.headers and \

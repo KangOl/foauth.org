@@ -51,12 +51,10 @@ class Box(foauth.providers.OAuth1):
 
         return self.parse_token(resp.content)
 
-    def api(self, key, domain, path, method='GET', params=None, data=None,
-            headers=None):
+    def api(self, key, domain, path, method='GET', **kwargs):
         url = 'https://%s%s' % (domain, path)
         auth = Auth(self.client_id, key.access_token)
-        return requests.request(method, url, auth=auth, params=params or {},
-                                data=data or {}, headers=dict(headers or {}))
+        return requests.request(method, url, auth=auth, **kwargs)
 
     def get_user_id(self, key):
         r = self.api(key, self.api_domains[0], u'/2.0/folders/0')
