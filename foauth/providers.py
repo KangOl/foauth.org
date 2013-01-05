@@ -6,6 +6,7 @@ import urlparse
 import flask
 import requests
 import requests.auth
+from oauthlib.oauth1.rfc5849 import SIGNATURE_TYPE_BODY
 from oauthlib.oauth2.draft25 import tokens
 from werkzeug.urls import url_decode
 
@@ -128,9 +129,10 @@ class OAuth1(OAuth):
                                     callback_uri=redirect_uri,
                                     signature_method=self.signature_method,
                                     signature_type=self.signature_type)
+        headers = {'Content-Length': '0'} if self.signature_type != SIGNATURE_TYPE_BODY else {}
         resp = requests.post(self.get_request_token_url(), auth=auth,
                              params=self.get_request_token_params(redirect_uri, scopes),
-                             headers={'Content-Length': '0'}, verify=self.verify)
+                             headers=headers, verify=self.verify)
         try:
             data = self.parse_token(resp.content)
         except Exception:
@@ -153,8 +155,9 @@ class OAuth1(OAuth):
                                     verifier=verifier,
                                     signature_method=self.signature_method,
                                     signature_type=self.signature_type)
+        headers = {'Content-Length': '0'} if self.signature_type != SIGNATURE_TYPE_BODY else {}
         resp = requests.post(self.access_token_url, auth=auth,
-                             headers={'Content-Length': '0'}, verify=self.verify)
+                             headers=headers, verify=self.verify)
         try:
             return self.parse_token(resp.content)
         except Exception:
