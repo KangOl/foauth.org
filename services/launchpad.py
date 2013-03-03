@@ -33,6 +33,10 @@ class Launchpad(foauth.providers.OAuth1):
 
     _local = local()
 
+    def __init__(self, key, secret):
+        # Launchpad secret must be empty. Configurated key is ignored.
+        super(Launchpad, self).__init__(key, '')
+
     def get_user_id(self, key):
         # As the redirection keep the same headers, the second request fail
         # because the nonce has already been consumed. In fact we don't even
