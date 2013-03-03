@@ -31,6 +31,8 @@ class Launchpad(foauth.providers.OAuth1):
     ]
     permissions_widget = 'radio'
 
+    returns_token = False
+
     _local = local()
 
     def __init__(self, key, secret):
@@ -50,9 +52,6 @@ class Launchpad(foauth.providers.OAuth1):
     def get_authorize_params(self, redirect_uri, scopes):
         params = super(Launchpad, self).get_authorize_params(redirect_uri,
                                                              scopes)
-        # Launchpad does not respect the spec and do not append the
-        # oauth_token to the callback url. So we do.
-        params['oauth_callback'] += '?oauth_token=' + params['oauth_token']
         # Launchpad specific. We specify the asked scope
         params['allow_permission'] = ','.join(scopes)
         return params
