@@ -108,7 +108,7 @@ li {
 	color: inherit;
 }
 
-ul, dd {
+ul {
 	margin-bottom: 9px;
 }
 
@@ -133,11 +133,11 @@ abbr {
 }
 
 .service .favicon {
-	margin-right: 24px;
+	margin-left: 22px;
 }
 
 .service th h3 {
-	background: 20px 11px no-repeat;
+	background: left 11px no-repeat;
 }
 
 .authorized th h3 {
@@ -321,7 +321,7 @@ td a img {
 }
 
 .service a {
-	margin: .5em 0;
+	margin: .5em;
 }
 
 .service h3 a {
@@ -330,6 +330,7 @@ td a img {
 
 p.footer {
 	text-align: center;
+	margin-top: 9px;
 }
 
 p.footer .g {

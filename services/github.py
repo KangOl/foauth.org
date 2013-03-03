@@ -15,7 +15,9 @@ class GitHub(foauth.providers.OAuth2):
 
     available_permissions = [
         (None, 'read your public profile, public repo info and gists'),
-        ('user', 'write to your profile'),
+        ('user:email', 'read your email address'),
+        ('user:follow', 'follow and unfollow users'),
+        ('user', 'read and write to your entire profile'),
         ('public_repo', 'write to your public repo info'),
         ('repo', 'write to your public and private repo info'),
         ('gist', 'write to your gists'),
@@ -24,7 +26,6 @@ class GitHub(foauth.providers.OAuth2):
     supports_state = False
 
     def get_scope_string(self, scopes):
-        # GitHub doesn't follow the spec on this point
         return ','.join(scopes)
 
     def parse_token(self, content):
@@ -32,4 +33,4 @@ class GitHub(foauth.providers.OAuth2):
 
     def get_user_id(self, key):
         r = self.api(key, self.api_domain, u'/user')
-        return unicode(r.json[u'id'])
+        return unicode(r.json()[u'id'])

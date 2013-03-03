@@ -12,10 +12,10 @@ class Netflix(foauth.providers.OAuth1):
     category = 'Movies/TV'
 
     # URLs to interact with the API
-    request_token_url = 'http://api.netflix.com/oauth/request_token'
+    request_token_url = 'http://api-public.netflix.com/oauth/request_token'
     authorize_url = 'https://api-user.netflix.com/oauth/login'
-    access_token_url = 'http://api.netflix.com/oauth/access_token'
-    api_domains = ['api-public.netflix.com', 'api.netflix.com']
+    access_token_url = 'http://api-public.netflix.com/oauth/access_token'
+    api_domain = 'api-public.netflix.com'
 
     available_permissions = [
         (None, 'read and manage your queue'),
@@ -30,10 +30,10 @@ class Netflix(foauth.providers.OAuth1):
         return params
 
     def get_user_id(self, key):
-        r = self.api(key, self.api_domains[0], u'/users/current',
+        r = self.api(key, self.api_domain, u'/users/current',
                      params={'output': 'json'})
-        redirect = r.json[u'resource'][u'link'][u'href']
+        redirect = r.json()[u'resource'][u'link'][u'href']
         parts = urlparse.urlparse(redirect)
         r = self.api(key, parts.netloc, parts.path,
                      params={'output': 'json'})
-        return r.json[u'user'][u'user_id']
+        return r.json()[u'user'][u'user_id']

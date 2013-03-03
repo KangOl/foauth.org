@@ -5,8 +5,8 @@ import urlparse
 
 import flask
 import requests
-import requests.auth
-from oauthlib.oauth1.rfc5849 import SIGNATURE_TYPE_BODY
+from requests_oauthlib import OAuth1 as OAuth1Manager
+from oauthlib.oauth1.rfc5849 import SIGNATURE_HMAC, SIGNATURE_TYPE_AUTH_HEADER
 from oauthlib.oauth2.draft25 import tokens
 from werkzeug.urls import url_decode
 
@@ -63,9 +63,11 @@ class OAuth(object):
 
     https = True
     verify = True
-    signature_method = requests.auth.SIGNATURE_HMAC
-    signature_type = requests.auth.SIGNATURE_TYPE_AUTH_HEADER
+    signature_method = SIGNATURE_HMAC
+    signature_type = SIGNATURE_TYPE_AUTH_HEADER
     permissions_widget = 'checkbox'
+    description = ''
+    disclaimer = ''
 
     def __init__(self, client_id, client_secret):
         self.client_id = client_id
@@ -86,15 +88,15 @@ class OAuth(object):
         redirect_uri = self.get_redirect_uri('callback')
         params = self.get_authorize_params(redirect_uri=redirect_uri,
                                            scopes=scopes)
-        req = requests.Request(self.authorize_url, params=params)
-        return flask.redirect(req.full_url)
+        req = requests.Request(url=self.authorize_url, params=params)
+        return flask.redirect(req.prepare().url)
 
     def login(self):
         redirect_uri = self.get_redirect_uri('login_callback')
         params = self.get_authorize_params(redirect_uri=redirect_uri,
                                            scopes=[])
-        req = requests.Request(self.authorize_url, params=params)
-        return flask.redirect(req.full_url)
+        req = requests.Request(url=self.authorize_url, params=params)
+        return flask.redirect(req.prepare().url)
 
     # The remainder of the API must be implemented for each flavor of OAuth
 
@@ -113,6 +115,8 @@ class OAuth(object):
 
 
 class OAuth1(OAuth):
+    returns_token = True
+
     def parse_token(self, content):
         content = url_decode(content)
         return {
@@ -124,20 +128,21 @@ class OAuth1(OAuth):
         return {}
 
     def get_authorize_params(self, redirect_uri, scopes):
-        auth = requests.auth.OAuth1(client_key=self.client_id,
-                                    client_secret=self.client_secret,
-                                    callback_uri=redirect_uri,
-                                    signature_method=self.signature_method,
-                                    signature_type=self.signature_type)
-        headers = {'Content-Length': '0'} if self.signature_type != SIGNATURE_TYPE_BODY else {}
+        auth = OAuth1Manager(client_key=self.client_id,
+                             client_secret=self.client_secret,
+                             callback_uri=redirect_uri,
+                             signature_method=self.signature_method,
+                             signature_type=self.signature_type)
         resp = requests.post(self.get_request_token_url(), auth=auth,
                              params=self.get_request_token_params(redirect_uri, scopes),
-                             headers=headers, verify=self.verify)
+                             verify=self.verify)
         try:
             data = self.parse_token(resp.content)
         except Exception:
             raise OAuthError('Unable to parse access token')
         flask.session['%s_temp_secret' % self.alias] = data['secret']
+        if not self.returns_token:
+            redirect_uri += ('?oauth_token=%s' % data['access_token'])
         return {
             'oauth_token': data['access_token'],
             'oauth_callback': redirect_uri,
@@ -148,16 +153,14 @@ class OAuth1(OAuth):
         verifier = data.get('oauth_verifier', None)
         secret = flask.session['%s_temp_secret' % self.alias]
         del flask.session['%s_temp_secret' % self.alias]
-        auth = requests.auth.OAuth1(client_key=self.client_id,
-                                    client_secret=self.client_secret,
-                                    resource_owner_key=token,
-                                    resource_owner_secret=secret,
-                                    verifier=verifier,
-                                    signature_method=self.signature_method,
-                                    signature_type=self.signature_type)
-        headers = {'Content-Length': '0'} if self.signature_type != SIGNATURE_TYPE_BODY else {}
-        resp = requests.post(self.access_token_url, auth=auth,
-                             headers=headers, verify=self.verify)
+        auth = OAuth1Manager(client_key=self.client_id,
+                             client_secret=self.client_secret,
+                             resource_owner_key=token,
+                             resource_owner_secret=secret,
+                             verifier=verifier,
+                             signature_method=self.signature_method,
+                             signature_type=self.signature_type)
+        resp = requests.post(self.access_token_url, auth=auth, verify=self.verify)
         try:
             return self.parse_token(resp.content)
         except Exception:
@@ -166,20 +169,21 @@ class OAuth1(OAuth):
     def api(self, key, domain, path, method='GET', **kwargs):
         protocol = self.https and 'https' or 'http'
         url = '%s://%s%s' % (protocol, domain, path)
-        auth = requests.auth.OAuth1(client_key=self.client_id,
-                                    client_secret=self.client_secret,
-                                    resource_owner_key=key.access_token,
-                                    resource_owner_secret=key.secret,
-                                    signature_method=self.signature_method,
-                                    signature_type=self.signature_type)
+        auth = OAuth1Manager(client_key=self.client_id,
+                             client_secret=self.client_secret,
+                             resource_owner_key=key.access_token,
+                             resource_owner_secret=key.secret,
+                             signature_method=self.signature_method,
+                             signature_type=self.signature_type)
         return requests.request(method, url, auth=auth,
-                                verify=self.verify, **kwargs)
+                                verify=self.verify, stream=True, **kwargs)
 
 
 class OAuth2(OAuth):
     token_type = BEARER
     bearer_type = BEARER_HEADER
     supports_state = True
+    auth = None
 
     def parse_token(self, content):
         return json.loads(content)
@@ -216,7 +220,7 @@ class OAuth2(OAuth):
             'grant_type': 'authorization_code',
             'code': data['code'],
             'redirect_uri': redirect_uri
-        }, verify=self.verify)
+        }, verify=self.verify, auth=self.auth)
 
         return self.parse_token(resp.content)
 
@@ -226,7 +230,7 @@ class OAuth2(OAuth):
             'client_secret': self.client_secret,
             'grant_type': 'refresh_token',
             'refresh_token': token
-        }, verify=self.verify)
+        }, verify=self.verify, auth=self.auth)
 
         return self.parse_token(resp.content)
 
@@ -238,4 +242,4 @@ class OAuth2(OAuth):
         else:
             auth = None
         return requests.request(method, url, auth=auth,
-                                verify=self.verify, **kwargs)
+                                verify=self.verify, stream=True, **kwargs)

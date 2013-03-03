@@ -2,6 +2,7 @@ import flask
 import hashlib
 import itertools
 import requests
+from urlparse import urlparse, parse_qsl
 from xml.dom import minidom
 
 import foauth.providers
@@ -27,7 +28,6 @@ class RememberTheMilk(foauth.providers.OAuth2):
     permissions_widget = 'radio'
 
     def parse_token(self, content):
-        # Grab the key out of the XML
         dom = minidom.parseString(content)
         access_token = dom.getElementsByTagName('token')[0].firstChild.nodeValue
         return {'access_token': access_token}
@@ -59,8 +59,8 @@ class RememberTheMilk(foauth.providers.OAuth2):
     def authorize(self, scopes):
         redirect_uri = self.get_redirect_uri('callback')
         params = self.get_authorize_params(redirect_uri, scopes)
-        req = requests.Request(self.authorize_url, params=params)
-        return flask.redirect(req.full_url)
+        req = requests.Request(url=self.authorize_url, params=params)
+        return flask.redirect(req.prepare().url)
 
     def api(self, key, domain, path, method='GET', **kwargs):
         url = 'http://%s%s' % (domain, path)
@@ -80,21 +80,13 @@ class Auth(object):
         self.auth_token = auth_token
 
     def __call__(self, r):
-        r.params['api_key'] = [self.client_id]
-        r.params['auth_token'] = [self.auth_token]
-        params = r.params or r.data
-        if hasattr(params, 'keys'):
-            params = self.iterparams(params)
-        signature = self.get_signature(params)
-        r.params['api_sig'] = signature
+        r.prepare_url(r.url, {'api_key': self.client_id, 'auth_token': self.auth_token})
+        if r.body:
+            params = parse_sql(r.body)
+        else:
+            params = parse_qsl(urlparse(r.url).query)
+        r.prepare_url(r.url, {'api_sig': self.get_signature(params)})
         return r
-
-    def iterparams(self, params):
-        # Pull the parameter values out of their lists,
-        # yielding multiple values for a key if necessary.
-        for key in sorted(params):
-            for val in params[key]:
-                yield (key, val)
 
     def get_signature(self, param_list):
         data = ''.join(i.encode('utf8') for i in itertools.chain(*sorted(param_list)))
